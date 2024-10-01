@@ -1,11 +1,10 @@
-// import { connection } from "mongoose";
 import { Server, Socket } from "socket.io";
 
 let connections = {}; // for number of connections;
 let messages = {}; 
 let onlineTime = {};
 
-export const connectToServer = (server) =>{
+export const connectToServer = (server) =>{ //server is socket.io server
     const io = new Server(server, {
         cors:{
             origin: "*",
@@ -13,22 +12,20 @@ export const connectToServer = (server) =>{
             allowedHeaders: ["*"],
             credentials: true
         }
-    }); // initializing socketio instance to the http server
+    }); // initializing socketio instance to the http server with cors
 
-    io.on('connection', (socket) => {  // listens for websocket connections from client
+    io.on('connection', (socket) => {  // listens for websocket connections from client. socket is socket.io server
 
-        //lobby created
+        //lobby created(signalling events)
         socket.on("join-call", (path)=>{ //listens on "join-call" event by client, path is loby link emitted by the client
 
             if(connections[path] === undefined){
                 connections[path] = [];
             }
-            connections[path].push(socket.id); //user id
+            connections[path].push(socket.id); //clients socket.id
             onlineTime[socket.id] = new Date(); //log in time
 
-            // for(let i=0; i<connections[path].length; i++){
-            //     io.to(connections[path][i].emmit("user-joined", socket.id, connections[path]));
-            // }
+            //All users in the path are notified that a new user has joined via the "user-joined" event.
             connections[path].forEach(eachDevicePath => {
                 io.to(eachDevicePath).emit("user-joined", socket.id, connections[path]);
             });
@@ -42,22 +39,24 @@ export const connectToServer = (server) =>{
         });
 
 
-        //signalling mechanism (exchange of socket.id)
+        //After joining, if the client needs to establish a direct connection with another peer
         socket.on("signal", (toId, message)=>{
-            socket.to(toId).emit("signal", socket.id, message);
+            io.to(toId).emit("signal", socket.id, message);
         });
 
 
         //event listeners for "chat messages"
         socket.on("chat-msg", (sender, data)=>{
             //finding the meeting room and isUser in the meeting room
-            const [meetingRoom, foundUser] = Object.entries(connections) // returns obj to array of arrays [[key, value], []...]
+
+            // returns obj to array of arrays [[key, value], []...] i.e connections = {"path": [socket1, socket2]} => [ ["path", [socket1, socket2] ] ]
+            const [meetingRoom, foundUser] = Object.entries(connections) 
                 .reduce(([room, found], [path, pathIds]) =>{
                     if(!found, pathIds.includes(socket.id)){
                         return [path, true]
                     }
                     return [room, found]
-                }, ['', false]); 
+                }, ['', false]);  
 
             // to store messages 
             if(messages[meetingRoom] === undefined){
@@ -81,7 +80,7 @@ export const connectToServer = (server) =>{
         socket.on("disconnect", ()=>{
             let key;
             //finding the users room
-            for([room, pathIds] of JSON.parse(JSON.stringify(Object.entries(connections)))){ // to create a deep clone 
+            for([room, pathIds] of JSON.parse(JSON.stringify(Object.entries(connections)))){ // to create a deep clone structure:[["path", ["socket1", "socket2"]]]
                 for(let i=0; i<pathIds.length; ++i){
                     if(pathIds === socket.id){
                         key = room;
