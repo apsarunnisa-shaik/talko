@@ -5,6 +5,7 @@ let messages = {};
 let onlineTime = {};
 
 export const connectToServer = (server) =>{ //server is socket.io server
+  
     const io = new Server(server, {
         cors:{
             origin: "*",
@@ -16,6 +17,8 @@ export const connectToServer = (server) =>{ //server is socket.io server
 
     io.on('connection', (socket) => {  // listens for websocket connections from client. socket is socket.io server
 
+        console.log("connected to socket");
+        
         //lobby created(signalling events)
         socket.on("join-call", (path)=>{ //listens on "join-call" event by client, path is loby link emitted by the client
 
@@ -31,8 +34,8 @@ export const connectToServer = (server) =>{ //server is socket.io server
             });
 
             if(messages[path] !== undefined){
-                for(let i=0; i< messages[path].length; i++){
-                    io.to("chat-msg").emit(messages[path][i]['data'], messages[path][i]['sender'], messages[path][i]['socket-id-sender']);
+                for(let i=0; i< messages[path].length; ++i){
+                    io.to(socket.id).emit("chat-msg", messages[path][i]['data'], messages[path][i]['sender'], messages[path][i]['socket-id-sender']);
                 }
             }
 
@@ -41,18 +44,19 @@ export const connectToServer = (server) =>{ //server is socket.io server
 
         //After joining, if the client needs to establish a direct connection with another peer
         socket.on("signal", (toId, message)=>{
+            console.log(`Received signal`);
             io.to(toId).emit("signal", socket.id, message);
         });
 
 
         //event listeners for "chat messages"
-        socket.on("chat-msg", (sender, data)=>{
+        socket.on("chat-msg", (data, sender)=>{
             //finding the meeting room and isUser in the meeting room
 
             // returns obj to array of arrays [[key, value], []...] i.e connections = {"path": [socket1, socket2]} => [ ["path", [socket1, socket2] ] ]
             const [meetingRoom, foundUser] = Object.entries(connections) 
                 .reduce(([room, found], [path, pathIds]) =>{
-                    if(!found, pathIds.includes(socket.id)){
+                    if(!found && pathIds.includes(socket.id)){
                         return [path, true]
                     }
                     return [room, found]
@@ -62,12 +66,13 @@ export const connectToServer = (server) =>{ //server is socket.io server
             if(messages[meetingRoom] === undefined){
                 messages[meetingRoom] = [];
             }
+
             messages[meetingRoom].push({
                 "sender": sender,
                 "data": data,
-                "socket-id-sender": socket-id-sender
+                "socket-id-sender": socket.id
             });
-            console.log(`the socket id is: ${socket-id-sender}, ${sender}: ${data}`);
+            console.log("message", meetingRoom, ":", sender, data);
 
             //Broadcasting the messages to all the users
             connections[meetingRoom].forEach((eachMsg) =>{
@@ -78,16 +83,19 @@ export const connectToServer = (server) =>{ //server is socket.io server
 
         //event triggers when client disconnect from server
         socket.on("disconnect", ()=>{
-            let key;
+
+            var diffTime = Math.abs(onlineTime[socket.id] - new Date());
+
+            var key;
             //finding the users room
-            for([room, pathIds] of JSON.parse(JSON.stringify(Object.entries(connections)))){ // to create a deep clone structure:[["path", ["socket1", "socket2"]]]
+            for(const [room, pathIds] of JSON.parse(JSON.stringify(Object.entries(connections)))){ // to create a deep clone structure:[["path", ["socket1", "socket2"]]]
                 for(let i=0; i<pathIds.length; ++i){
-                    if(pathIds === socket.id){
+                    if(pathIds[i] === socket.id){
                         key = room;
 
                         //emitting a user-left event to the remaining users
                         for(let i=0; i<connections[room].length; ++i){
-                            io.to("connections[room][i]").emit("user-left", socket.id);
+                            io.to(connections[room][i]).emit("user-left", socket.id);
                         }
 
                         //removing the user from room
