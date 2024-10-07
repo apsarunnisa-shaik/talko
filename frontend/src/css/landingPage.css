@@ -56,3 +56,12 @@
     height: 70vh;
     width: auto;
   }
+
+  @media( max-width: 400px){
+    .landingPageImg{
+      display: none;
+    }
+    .landingMainContainer h1{
+      font-size: 2rem;
+    }
+  }
