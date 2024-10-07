@@ -16,7 +16,7 @@ import server from "../env.js"
 
 // import server from '../environment';
 
-const server_url = `${server}`;
+const server_url = server;
 
 var connections = {};
 
