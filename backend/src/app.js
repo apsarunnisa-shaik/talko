@@ -1,9 +1,4 @@
 import express from "express"; //express
-import { config } from "dotenv";
-if(process.env.NODE_ENV !== "Production"){
-    config();
-}
-
 import mongoose from 'mongoose'; //mongoose
 import { createServer } from "http"; //socketio
 import cors from "cors"; //cors
@@ -25,7 +20,7 @@ app.use("/api/v1/users", userRoutes); //middleware allows to use all user routes
 
 const start = async () => {
     try{
-        const connectionDb = await mongoose.connect(process.env.ATLAS_URL);
+        const connectionDb = await mongoose.connect("mongodb+srv://Apsarunnisa:hPUTQ4zka7hEXRP8@cluster0.ix4dd.mongodb.net/");
         console.log(`MONGO Connected DB HOst: ${connectionDb.connection.host}`);
     }catch(e){
         console.log(`atlas error ${e}`);
